@@ -241,11 +241,11 @@ async function pollStatus() {
         break
 
       case 6:
-        // Error
+        // Error — always logout to free the device
         stopPolling()
-        phase.value = 'error'
         errorMessage.value = 'Device reported an error during the transaction.'
         await logoutDevice()
+        phase.value = 'error'
         break
     }
   } catch (err) {
@@ -269,13 +269,14 @@ async function handleCancel() {
 
   try {
     await api.post('/sesami/operation/cancel')
-    phase.value = 'cancelled'
   } catch (err) {
-    phase.value = 'error'
+    // cancel may fail if operation already ended — proceed to logout anyway
     errorMessage.value = err.response?.data?.error || 'Cancel failed'
-  } finally {
-    cancelling.value = false
   }
+  // Always logout — this is the critical step to free the device
+  await logoutDevice()
+  phase.value = 'cancelled'
+  cancelling.value = false
 }
 
 async function finalizeSuccess() {
@@ -296,15 +297,18 @@ async function finalizeSuccess() {
 }
 
 async function finalizeCancel() {
+  // Operation may already be in a terminal state (cancelled by machine),
+  // so cancel call might fail — that's OK. Always logout after.
   try {
     await api.post('/sesami/operation/cancel')
   } catch {}
+  await logoutDevice()
   phase.value = 'cancelled'
 }
 
 async function logoutDevice() {
   try {
-    await api.post('/sesami/operation/cancel')
+    await api.post('/sesami/logout')
   } catch {}
 }
 

@@ -5,13 +5,43 @@ const sesami = require('../sesami/client');
 const db = require('../db');
 const { authMiddleware } = require('./auth');
 
-// GET /api/sesami/heartbeat — check device reachability (no login needed)
+// POST /api/sesami/test-connection — test with form values WITHOUT saving them
+router.post('/test-connection', async (req, res) => {
+  const { ip, port, useHttps } = req.body
+  if (!ip || !port) return res.status(400).json({ error: 'ip and port required' })
+
+  const axios = require('axios')
+  const https = require('https')
+  const protocol = useHttps ? 'https' : 'http'
+  const url = `${protocol}://${ip}:${port}/api/pos/v3/heartbeat`
+
+  console.log('[RC5000] test-connection →', url)
+  try {
+    const response = await axios.get(url, {
+      timeout: 8000,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      validateStatus: null
+    })
+    console.log('[RC5000] test-connection response:', response.status)
+    if (response.status === 200) {
+      res.json({ ok: true, data: response.data })
+    } else {
+      res.status(502).json({ error: `Device returned HTTP ${response.status}`, detail: response.data })
+    }
+  } catch (err) {
+    console.error('[RC5000] test-connection error:', err.message)
+    res.status(503).json({ error: err.message, code: err.code })
+  }
+})
+
+// GET /api/sesami/heartbeat — check device reachability via /status (no login needed)
 router.get('/heartbeat', async (req, res) => {
   try {
     const data = await sesami.getHeartbeat();
     res.json(data);
   } catch (err) {
-    res.status(503).json({ error: 'Device unreachable', detail: err.message });
+    console.error('[RC5000 heartbeat error]', err.message);
+    res.status(503).json({ error: 'Device unreachable', detail: err.message, code: err.code });
   }
 });
 
@@ -21,7 +51,8 @@ router.get('/status', async (req, res) => {
     const data = await sesami.getStatus();
     res.json(data);
   } catch (err) {
-    res.status(503).json({ error: 'Device unreachable', detail: err.message });
+    console.error('[RC5000 status error]', err.message);
+    res.status(503).json({ error: 'Device unreachable', detail: err.message, code: err.code });
   }
 });
 
@@ -140,6 +171,18 @@ router.post('/operation/cancel', authMiddleware, async (req, res) => {
     res.status(503).json({ error: 'RC5000 error', detail: err.message });
   }
 });
+
+// POST /api/sesami/logout — force logout regardless of operation state
+// Call this after any terminal state (error, cancel by machine, etc.)
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    await sesami.logout()
+    res.json({ ok: true })
+  } catch (err) {
+    // Even if logout fails on the device side, clear the session
+    res.json({ ok: true, warning: err.message })
+  }
+})
 
 // GET /api/sesami/transactions — get transaction history
 router.get('/transactions', authMiddleware, (req, res) => {

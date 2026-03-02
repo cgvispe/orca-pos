@@ -145,7 +145,7 @@
               <h3>🔌 RC5000 Connection</h3>
               <div class="field-row">
                 <div class="field"><label>IP Address</label><input v-model="settings.sesami.ip" placeholder="192.168.1.100" /></div>
-                <div class="field"><label>Port</label><input v-model="settings.sesami.port" placeholder="3000" /></div>
+                <div class="field"><label>Port</label><input v-model="settings.sesami.port" placeholder="4443" /></div>
               </div>
               <div class="field-row">
                 <div class="field"><label>POS ID</label><input v-model="settings.sesami.posId" placeholder="POS1" /></div>
@@ -350,7 +350,12 @@ async function loadSettingsFull() {
   try {
     const res = await api.get('/settings')
     Object.assign(settings, res.data)
-    if (!settings.sesami) settings.sesami = {}
+    if (!settings.sesami) settings.sesami = { ip: '', port: '4443', useHttps: true, posId: 'POS1', username: '', secretKey: '' }
+    if (settings.theme && !settings.theme.logoUrl) { settings.theme.logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAwADgDASIAAhEBAxEB/8QAGwABAQEAAgMAAAAAAAAAAAAAAAcGBQgCAwn/xAA0EAAABQIBCAgGAwAAAAAAAAAAAQIDBAUGEQcIEhYYIVVzMTQ2OFNWk9GSlbGytNITYnH/xAAaAQABBQEAAAAAAAAAAAAAAAACAAEDBAUH/8QAKhEAAQQBAAYLAAAAAAAAAAAAAQACAwQRBQYSMUFxITIzNDVhcoGywdH/2gAMAwEAAhEDEQA/AO5YD0T5TMKG7LkGZNNJ0lGRYnh/g4XXKheM96KgbY3O3BVZ71au7ZleGnzOFoQGe1yoXjPeioZu+Ms9iWa3EXXJk1pMtS0tfxQ1uYmkiM8cC3dJBzE8DJCCLSNSZ4ZHICTwBCooCKbUOSTiVU+WO+wbUOSTiVU+WO+wDBV1WsBw1kXNSbxtaFctDcddp01KlMqcbNtRklRpPFJ7y3pMAyS87x7MT+Uf1EoFXvHsxP5R/USgaNPqHmufa3d6Z6fsoIbnadTtrmyPtQLkIbnadTtrmyPtQJp+zKzdXvEY/f4lQMAAZy6ivoRmm93u1eU/+Q6AZpvd7tXlP/kOgIjvRKlVWGioU5+EtakJeTompPSQzOocLiEn4U+w14A2SvYMNKo2tG1bbg+ZmSOjishqHC4hJ+FPsMblOyCUW+2qe3MuCpwyhKcUk2UNnpaZJI8cS/qLCAczyOGCVHBoilXkEkceHDn+rrRsgWv5yrvpM/qGyBa/nKu+kz+o7LgI9orSWbyZWjFsSxqbakOY/MYp6VpQ88REtektS9+ju6VYANIAZJf/2Q==' }
+    // Apply default logo if none is set
+    if (settings.theme && !settings.theme.logoUrl) {
+      settings.theme.logoUrl = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAwADgDASIAAhEBAxEB/8QAGwABAQEAAgMAAAAAAAAAAAAAAAcGBQgCAwn/xAA0EAAABQIBCAgGAwAAAAAAAAAAAQIDBAUGEQcIEhYYIVVzMTQ2OFNWk9GSlbGytNITYnH/xAAaAQABBQEAAAAAAAAAAAAAAAACAAEDBAUH/8QAKhEAAQQBAAYLAAAAAAAAAAAAAQACAwQRBQYSMUFxITIzNDVhcoGywdH/2gAMAwEAAhEDEQA/AO5YD0T5TMKG7LkGZNNJ0lGRYnh/g4XXKheM96KgbY3O3BVZ71au7ZleGnzOFoQGe1yoXjPeioZu+Ms9iWa3EXXJk1pMtS0tfxQ1uYmkiM8cC3dJBzE8DJCCLSNSZ4ZHICTwBCooCKbUOSTiVU+WO+wbUOSTiVU+WO+wDBV1WsBw1kXNSbxtaFctDcddp01KlMqcbNtRklRpPFJ7y3pMAyS87x7MT+Uf1EoFXvHsxP5R/USgaNPqHmufa3d6Z6fsoIbnadTtrmyPtQLkIbnadTtrmyPtQJp+zKzdXvEY/f4lQMAAZy6ivoRmm93u1eU/+Q6AZpvd7tXlP/kOgIjvRKlVWGioU5+EtakJeTompPSQzOocLiEn4U+w14A2SvYMNKo2tG1bbg+ZmSOjishqHC4hJ+FPsMblOyCUW+2qe3MuCpwyhKcUk2UNnpaZJI8cS/qLCAczyOGCVHBoilXkEkceHDn+rrRsgWv5yrvpM/qGyBa/nKu+kz+o7LgI9orSWbyZWjFsSxqbakOY/MYp6VpQ88REtektS9+ju6VYANIAZJf/2Q=='
+    }
     if (!settings.theme) settings.theme = {}
     const sesamiRes = await api.get('/settings/sesami-full')
     settings.sesami.secretKey = sesamiRes.data.secretKey || ''
@@ -384,9 +389,22 @@ async function saveSettings() {
   finally { savingSettings.value = false }
 }
 async function testConnection() {
-  connectionStatus.value = null
-  try { const res = await api.get('/sesami/heartbeat'); connectionStatus.value = { type: 'ok', message: `✅ Connected — Status: ${res.data.status}` } }
-  catch { connectionStatus.value = { type: 'error', message: '❌ Cannot reach device. Check IP and port.' } }
+  connectionStatus.value = { type: 'testing', message: '⏳ Testing connection...' }
+  try {
+    const res = await api.post('/sesami/test-connection', {
+      ip: settings.sesami.ip,
+      port: settings.sesami.port,
+      useHttps: settings.sesami.useHttps
+    })
+    const s = res.data.data?.status
+    const labels = { 1:'Initializing', 2:'Ready', 4:'Session active', 5:'Processing', 11:'Waiting', 12:'Warning', 13:'Error' }
+    const statusLabel = s !== undefined ? ` — Device status: ${labels[s] || s}` : ''
+    connectionStatus.value = { type: 'ok', message: `✅ Connected${statusLabel}` }
+  } catch (err) {
+    const detail = err.response?.data?.error || err.response?.data?.detail || err.message || 'Unknown error'
+    const code = err.response?.data?.code ? ` (${err.response.data.code})` : ''
+    connectionStatus.value = { type: 'error', message: `❌ ${detail}${code}` }
+  }
 }
 
 // ── Users ──
@@ -562,6 +580,7 @@ onMounted(async () => {
 .color-text { flex: 1; }
 .connection-status { font-size: 13px; padding: 8px 12px; border-radius: var(--radius-sm); }
 .connection-status.ok { background: var(--color-success-alpha); color: var(--color-success); }
+.connection-status.testing { background: var(--color-primary-alpha); color: var(--color-primary); }
 .connection-status.error { background: var(--color-danger-alpha); color: var(--color-danger); }
 .logo-upload-area { display: flex; gap: 16px; align-items: flex-start; }
 .logo-preview { width: 80px; height: 80px; border: 2px dashed var(--color-border); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; background: var(--color-surface-2); cursor: pointer; transition: border-color 0.2s; position: relative; }
