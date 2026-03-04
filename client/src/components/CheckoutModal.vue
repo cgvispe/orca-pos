@@ -40,30 +40,91 @@
             </div>
 
             <p class="insert-hint">👆 Please insert banknotes or coins into the recycler</p>
-
-            <button class="btn-danger mt-20" @click="handleCancel" :disabled="cancelling">
-              <span v-if="cancelling" class="spinner-sm"></span>
-              <span v-else>Cancel Transaction</span>
-            </button>
+            <p class="operation-lock-note">🔒 Operation in progress — cannot cancel</p>
           </div>
 
           <!-- ── PHASE: Amount not available (status 7) ── -->
           <div v-else-if="phase === 'insufficient'" class="phase-center">
             <div class="icon-warning">⚠️</div>
-            <h2>Insufficient Change</h2>
+            <h2>Cannot Dispense Full Change</h2>
             <p class="phase-sub">
-              The device cannot provide exact change.<br/>
-              Received: <strong>{{ theme.formatCurrency(totalIn) }}</strong>
+              The recycler cannot return exact change for this amount.<br/>
+              Cash inserted: <strong>{{ theme.formatCurrency(totalIn) }}</strong>
             </p>
+            <div class="insufficient-options mt-20">
+              <div class="option-card" @click="handleFinish">
+                <span class="option-icon">✅</span>
+                <div>
+                  <p class="option-title">Finish transaction</p>
+                  <p class="option-desc">Accept partial change — cashier returns the difference manually</p>
+                </div>
+              </div>
+              <div class="option-card danger" @click="handleCancel">
+                <span class="option-icon">↩️</span>
+                <div>
+                  <p class="option-title">Cancel &amp; return cash</p>
+                  <p class="option-desc">Recycler returns all inserted cash to the customer</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── PHASE: Refund waiting ── -->
+          <div v-else-if="phase === 'refund-waiting'" class="phase-waiting">
+            <div class="waiting-header">
+              <div class="device-badge refund">RC5000</div>
+              <span class="status-dot pulsing warning"></span>
+              <span class="status-text">Dispensing cash...</span>
+            </div>
+            <div class="amount-display">
+              <p class="label-sm">Amount to dispense</p>
+              <p class="amount-due refund-color">{{ theme.formatCurrency(Math.abs(props.total)) }}</p>
+            </div>
+            <div class="progress-area">
+              <div class="progress-row">
+                <span class="prog-label">Dispensed</span>
+                <span class="prog-value inserted">{{ theme.formatCurrency(totalOut) }}</span>
+              </div>
+              <div class="prog-bar-track">
+                <div class="prog-bar-fill warning" :style="{ width: Math.min(100, (totalOut / Math.abs(props.total)) * 100) + '%' }"></div>
+              </div>
+            </div>
+            <p class="operation-lock-note">🔒 Dispensing in progress — cannot cancel</p>
+          </div>
+
+          <!-- ── PHASE: Refund success ── -->
+          <div v-else-if="phase === 'refund-success'" class="phase-center">
+            <div class="success-circle refund">
+              <span class="success-check">↩</span>
+            </div>
+            <h2 class="text-warning">Refund Complete</h2>
+            <div class="receipt-summary">
+              <div class="receipt-row">
+                <span>Refund amount</span>
+                <span>{{ theme.formatCurrency(Math.abs(props.total)) }}</span>
+              </div>
+              <div class="receipt-row">
+                <span>Dispensed</span>
+                <span>{{ theme.formatCurrency(totalIn) }}</span>
+              </div>
+            </div>
+            <button class="btn-primary mt-20" @click="handleClose">New Sale</button>
+          </div>
+
+          <!-- ── PHASE: Manual payment ── -->
+          <div v-else-if="phase === 'manual'" class="phase-center">
+            <div class="icon-manual">💵</div>
+            <h2>{{ props.refundMode ? 'Manual Refund' : 'Manual Payment' }}</h2>
+            <p class="phase-sub">{{ props.refundMode ? 'Dispense cash manually to the customer.' : 'No RC5000 configured. Collect cash manually.' }}</p>
+            <div class="receipt-summary mt-20">
+              <div class="receipt-row">
+                <span>Amount due</span>
+                <span class="total-amount">{{ theme.formatCurrency(props.total) }}</span>
+              </div>
+            </div>
             <div class="btn-group mt-20">
-              <button class="btn-primary" @click="handleFinish" :disabled="finishing">
-                <span v-if="finishing" class="spinner-sm"></span>
-                <span v-else>Finish (Accept)</span>
-              </button>
-              <button class="btn-danger" @click="handleCancel" :disabled="cancelling">
-                <span v-if="cancelling" class="spinner-sm"></span>
-                <span v-else>Cancel & Return Cash</span>
-              </button>
+              <button class="btn-secondary" @click="handleClose">Cancel</button>
+              <button class="btn-primary" @click="confirmManual">✓ Confirm Payment</button>
             </div>
           </div>
 
@@ -93,9 +154,7 @@
               Return <strong>{{ theme.formatCurrency(change) }}</strong> to the customer
             </p>
 
-            <button class="btn-primary mt-20" @click="handleClose">
-              New Sale
-            </button>
+            <button class="btn-primary mt-20" @click="handleClose">New Sale</button>
           </div>
 
           <!-- ── PHASE: Cancelled ── -->
@@ -104,6 +163,36 @@
             <h2>Transaction Cancelled</h2>
             <p class="phase-sub">Cash has been returned to the customer.</p>
             <button class="btn-secondary mt-20" @click="handleClose">Close</button>
+          </div>
+
+          <!-- ── PHASE: Device busy / error — offer retry, manual, cancel ── -->
+          <div v-else-if="phase === 'device-error'" class="phase-center">
+            <div class="icon-error">⚠️</div>
+            <h2 class="text-danger">RC5000 Unavailable</h2>
+            <p class="phase-sub">{{ errorMessage }}</p>
+            <div class="insufficient-options mt-20">
+              <div class="option-card" @click="startTransaction">
+                <span class="option-icon">🔄</span>
+                <div>
+                  <p class="option-title">Retry</p>
+                  <p class="option-desc">Try connecting to the RC5000 again</p>
+                </div>
+              </div>
+              <div class="option-card" @click="switchToManual">
+                <span class="option-icon">{{ props.refundMode ? '↩️' : '💵' }}</span>
+                <div>
+                  <p class="option-title">{{ props.refundMode ? 'Manual refund' : 'Manual payment' }}</p>
+                  <p class="option-desc">{{ props.refundMode ? 'Process refund without the recycler' : 'Process the sale without the recycler' }}</p>
+                </div>
+              </div>
+              <div class="option-card danger" @click="handleClose">
+                <span class="option-icon">✕</span>
+                <div>
+                  <p class="option-title">Cancel sale</p>
+                  <p class="option-desc">Abort and return to the POS</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- ── PHASE: Error ── -->
@@ -124,18 +213,23 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import api from '@/api'
 import { useThemeStore } from '@/stores/theme'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   visible: Boolean,
   total: Number,
-  cartItems: Array
+  cartItems: Array,
+  refundMode: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['close', 'success'])
 const theme = useThemeStore()
 
 // State
-const phase = ref('connecting')  // connecting | waiting | insufficient | success | cancelled | error
+const auth  = useAuthStore()
+const deviceId = computed(() => auth.deviceId)
+
+const phase = ref('connecting')  // connecting | waiting | insufficient | success | cancelled | error | device-error | manual | refund-waiting | refund-success
 const operationId = ref(null)
 const totalIn = ref(0)
 const totalOut = ref(0)
@@ -163,22 +257,66 @@ watch(() => props.visible, async (v) => {
 
 async function startTransaction() {
   resetState()
+
+  // Manual mode — no device configured
+  if (!deviceId.value) {
+    phase.value = 'manual'
+    return
+  }
+
   phase.value = 'connecting'
-
+  const isRefund = props.refundMode
   try {
-    const res = await api.post('/sesami/payin', {
-      amount: props.total,
+    const endpoint = isRefund ? '/sesami/payout' : '/sesami/payin'
+    const res = await api.post(endpoint, {
+      deviceId: deviceId.value,
+      amount: Math.abs(props.total),
       cartItems: props.cartItems,
-      cartTotal: props.total
+      cartTotal: Math.abs(props.total)
     })
-
-    operationId.value = res.data.operationId
-    phase.value = 'waiting'
+    operationId.value = res.data.operationId || res.data.id
+    phase.value = isRefund ? 'refund-waiting' : 'waiting'
     startPolling()
   } catch (err) {
-    phase.value = 'error'
-    errorMessage.value = err.response?.data?.error || 'Could not connect to RC5000. Check device settings.'
+    const detail = err.response?.data?.detail || err.response?.data?.error || err.message || ''
+    const status = err.response?.status
+    // 503 = device busy or unreachable → offer retry/manual/cancel
+    // 500 login errors also → offer retry/manual/cancel
+    if (status === 503 || status === 500 || !err.response) {
+      errorMessage.value = detail || 'The RC5000 is busy or unreachable.'
+      phase.value = 'device-error'
+    } else {
+      phase.value = 'error'
+      errorMessage.value = detail || 'Could not start transaction.'
+    }
   }
+}
+
+function switchToManual() {
+  phase.value = 'manual'
+}
+
+async function confirmManual() {
+  try {
+    if (props.refundMode) {
+      await api.post('/sesami/operation/finish-refund', {
+        cartItems: props.cartItems,
+        cartTotal: Math.abs(props.total),
+        amountDispensed: Math.abs(props.total),
+        manual: true
+      })
+      phase.value = 'refund-success'
+    } else {
+      await api.post('/sesami/operation/finish-manual', {
+        cartItems: props.cartItems,
+        cartTotal: props.total
+      })
+      phase.value = 'success'
+    }
+  } catch {}
+  totalIn.value = Math.abs(props.total)
+  change.value = 0
+  emit('success')
 }
 
 function startPolling() {
@@ -197,10 +335,11 @@ async function pollStatus() {
   if (!operationId.value) return
 
   try {
-    const res = await api.get(`/sesami/operation/${operationId.value}`)
+    const res = await api.get(`/sesami/operation/${deviceId.value}/${operationId.value}`)
     const data = res.data
 
-    totalIn.value = data.totalIn || 0
+    totalIn.value  = data.totalIn  || 0
+    totalOut.value = data.totalOut || 0
     totalOut.value = data.totalOut || 0
 
     // OperationStatus codes:
@@ -281,15 +420,30 @@ async function handleCancel() {
 
 async function finalizeSuccess() {
   try {
-    const res = await api.post('/sesami/operation/finish', {
-      operationId: operationId.value,
-      cartItems: props.cartItems,
-      cartTotal: props.total,
-      amountReceived: totalIn.value,
-      change: change.value
-    })
-    phase.value = 'success'
-    emit('success', res.data.transaction)
+    if (props.refundMode) {
+      const res = await api.post('/sesami/operation/finish-refund', {
+        deviceId: deviceId.value,
+        operationId: operationId.value,
+        cartItems: props.cartItems,
+        cartTotal: Math.abs(props.total),
+        amountDispensed: totalOut.value || Math.abs(props.total)
+      })
+      totalIn.value = totalOut.value || Math.abs(props.total)
+      change.value = 0
+      phase.value = 'refund-success'
+      emit('success', res.data.transaction)
+    } else {
+      const res = await api.post('/sesami/operation/finish', {
+        deviceId: deviceId.value,
+        operationId: operationId.value,
+        cartItems: props.cartItems,
+        cartTotal: props.total,
+        amountReceived: totalIn.value,
+        change: change.value
+      })
+      phase.value = 'success'
+      emit('success', res.data.transaction)
+    }
   } catch (err) {
     phase.value = 'error'
     errorMessage.value = err.response?.data?.error || 'Failed to finalize transaction'
@@ -300,7 +454,7 @@ async function finalizeCancel() {
   // Operation may already be in a terminal state (cancelled by machine),
   // so cancel call might fail — that's OK. Always logout after.
   try {
-    await api.post('/sesami/operation/cancel')
+    await api.post('/sesami/operation/cancel', { deviceId: deviceId.value })
   } catch {}
   await logoutDevice()
   phase.value = 'cancelled'
@@ -308,7 +462,7 @@ async function finalizeCancel() {
 
 async function logoutDevice() {
   try {
-    await api.post('/sesami/logout')
+    await api.post('/sesami/logout', { deviceId: deviceId.value })
   } catch {}
 }
 
@@ -320,7 +474,7 @@ function handleBackdropClick() {
 
 function handleClose() {
   stopPolling()
-  emit('close', phase.value === 'success')
+  emit('close', phase.value === 'success' || phase.value === 'refund-success')
 }
 
 function resetState() {
@@ -579,4 +733,29 @@ onUnmounted(() => stopPolling())
 
 /* ── Utils ── */
 .mt-20 { margin-top: 20px; }
+.icon-manual { font-size: 56px; margin-bottom: 8px; }
+.device-badge.refund { background: var(--color-warning-alpha); color: var(--color-warning); border-color: var(--color-warning); }
+.status-dot.warning { background: var(--color-warning); }
+.amount-due.refund-color { color: var(--color-warning); }
+.prog-bar-fill.warning { background: var(--color-warning); }
+.success-circle.refund { background: var(--color-warning-alpha); border: 2px solid var(--color-warning); }
+.text-warning { color: var(--color-warning); }
+.operation-lock-note { font-size: 12px; color: var(--color-text-3); margin-top: 16px; }
+.insufficient-options { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.option-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  width: 100%;
+}
+.option-card:hover { border-color: var(--color-primary); background: var(--color-primary-alpha); }
+.option-card.danger:hover { border-color: var(--color-danger); background: var(--color-danger-alpha); }
+.option-icon { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+.option-title { font-weight: 600; font-size: 14px; color: var(--color-text); margin: 0; }
+.option-desc { font-size: 12px; color: var(--color-text-2); margin: 2px 0 0 0; }
 </style>

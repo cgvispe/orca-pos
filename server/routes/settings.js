@@ -12,46 +12,27 @@ const logoStorage = multer.diskStorage({
 });
 const upload = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 } });
 
-// GET /api/settings — public (theme needed for all users)
-router.get('/', (req, res) => {
-  const settings = db.getSettings();
-  // Don't expose secret key to frontend
-  const safe = { ...settings, sesami: { ...settings.sesami, secretKey: undefined } };
-  res.json(safe);
-});
+// GET /api/settings — public (theme + business info needed for all users)
+router.get('/', (req, res) => res.json(db.getSettings()));
 
 // PUT /api/settings — manager only
 router.put('/', authMiddleware, upload.single('logo'), (req, res) => {
   if (req.user.role !== 'manager') return res.status(403).json({ error: 'Forbidden' });
 
-  const current = db.getSettings();
   let body;
-  try {
-    body = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body;
-  } catch {
-    body = req.body;
-  }
+  try { body = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body; }
+  catch { body = req.body; }
 
+  const current = db.getSettings();
   const updated = {
-    ...current,
-    ...body,
-    sesami: { ...current.sesami, ...(body.sesami || {}) },
+    ...current, ...body,
     theme: { ...current.theme, ...(body.theme || {}) }
   };
-
-  if (req.file) {
-    updated.theme.logoUrl = `/uploads/${req.file.filename}`;
-  }
+  if (req.file) updated.theme.logoUrl = `/uploads/${req.file.filename}`;
+  if (body.clearLogo === 'true') updated.theme.logoUrl = '';
 
   db.saveSettings(updated);
-  // Return safe version
-  res.json({ ...updated, sesami: { ...updated.sesami, secretKey: undefined } });
-});
-
-// GET /api/settings/sesami-full — manager only (includes secret key for editing)
-router.get('/sesami-full', authMiddleware, (req, res) => {
-  if (req.user.role !== 'manager') return res.status(403).json({ error: 'Forbidden' });
-  res.json(db.getSettings().sesami);
+  res.json(db.getSettings());
 });
 
 module.exports = router;

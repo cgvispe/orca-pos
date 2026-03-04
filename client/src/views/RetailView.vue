@@ -40,7 +40,8 @@
           </div>
         </div>
 
-        <RC5000Status />
+        <span v-if="auth.deviceName" class="device-label">🏧 {{ auth.deviceName }}</span>
+        <RC5000Status :deviceId="auth.deviceId" />
 
         <button v-if="auth.isManager" class="btn-icon" @click="$router.push('/manager')" title="Manager panel">⚙️</button>
         <button class="btn-icon" @click="handleLogout" title="Logout">🔓</button>
@@ -67,11 +68,18 @@
         </div>
       </main>
 
-      <CartPanel @checkout="openCheckout" />
+      <CartPanel @checkout="openCheckout" @manual-amount="manualAmountOpen = true" />
     </div>
+
+    <ManualAmountModal
+      :visible="manualAmountOpen"
+      @close="manualAmountOpen = false"
+      @confirm="onManualAmountConfirm"
+    />
 
     <CheckoutModal
       :visible="checkoutOpen"
+      :refundMode="cart.isRefund"
       :total="cart.total"
       :cartItems="cart.items"
       @close="handleCheckoutClose"
@@ -92,6 +100,7 @@ import ProductCard from '@/components/ProductCard.vue'
 import CartPanel from '@/components/CartPanel.vue'
 import CheckoutModal from '@/components/CheckoutModal.vue'
 import RC5000Status from '@/components/RC5000Status.vue'
+import ManualAmountModal from '@/components/ManualAmountModal.vue'
 import { useCartStore } from '@/stores/cart'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -107,6 +116,7 @@ const loadingItems = ref(true)
 const activeCategory = ref('')
 const search = ref('')
 const checkoutOpen = ref(false)
+const manualAmountOpen = ref(false)
 const toast = ref(null)
 let toastTimer = null
 
@@ -126,8 +136,24 @@ const filteredItems = computed(() => {
 })
 
 onMounted(async () => {
+  await theme.loadFromServer()
   await loadItems()
+  // Managers arriving at POS need a device too — auto-select default
+  if (auth.isManager && !auth.hasDevice) {
+    try {
+      const res = await api.get('/devices')
+      const configured = res.data.filter(d => d.ip && d.ip.trim() !== '')
+      if (configured.length > 0) {
+        const def = configured.find(d => d.isDefault) || configured[0]
+        auth.selectDevice(def)
+      }
+    } catch {}
+  }
 })
+
+function onManualAmountConfirm({ amount, reason }) {
+  cart.addManualItem({ amount, reason })
+}
 
 async function loadItems() {
   loadingItems.value = true
@@ -341,4 +367,13 @@ function showToast(message, type = 'info') {
 .toast-leave-active { transition: all 0.2s ease-in; }
 .toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(10px); }
 .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(10px); }
+.device-label {
+  font-size: 12px;
+  color: var(--color-text-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-family: monospace;
+}
 </style>

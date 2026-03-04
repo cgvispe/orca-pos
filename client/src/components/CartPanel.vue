@@ -51,15 +51,34 @@
       </div>
       <div class="summary-row total">
         <span>Total</span>
-        <span class="total-amount">{{ cart.formattedTotal }}</span>
+        <span class="total-amount" :class="{ refund: cart.isRefund }">
+          {{ cart.formattedSignedTotal }}
+        </span>
       </div>
+
+      <!-- Refund toggle — only for authorized users -->
+      <label v-if="auth.user?.canRefund || auth.isManager" class="refund-toggle" :class="{ active: cart.isRefund }">
+        <input type="checkbox" :checked="cart.isRefund" @change="cart.setRefund($event.target.checked)" />
+        <span class="refund-toggle-track">
+          <span class="refund-toggle-thumb"></span>
+        </span>
+        <span class="refund-toggle-label">{{ cart.isRefund ? '↩️ Refund mode' : 'Refund mode' }}</span>
+      </label>
+
+      <!-- Manual amount button -->
+      <button class="btn-manual-amount" @click="$emit('manual-amount')">
+        <span>＋</span> Add manual amount
+      </button>
+
       <button
         class="btn-checkout"
+        :class="{ manual: !auth.hasDevice, refund: cart.isRefund }"
         :disabled="cart.isEmpty"
         @click="$emit('checkout')"
       >
-        <span class="checkout-icon">💳</span>
-        Pay {{ cart.isEmpty ? '' : cart.formattedTotal }}
+        <span class="checkout-icon">{{ cart.isRefund ? '↩️' : (auth.hasDevice ? '🏧' : '💵') }}</span>
+        {{ cart.isRefund ? 'Dispense' : (auth.hasDevice ? 'Pay' : 'Manual Pay') }}
+        {{ cart.isEmpty ? '' : cart.formattedTotal }}
       </button>
     </div>
   </aside>
@@ -68,10 +87,12 @@
 <script setup>
 import { useCartStore } from '@/stores/cart'
 import { useThemeStore } from '@/stores/theme'
+import { useAuthStore } from '@/stores/auth'
 
-const cart = useCartStore()
+const cart  = useCartStore()
 const theme = useThemeStore()
-defineEmits(['checkout'])
+const auth  = useAuthStore()
+defineEmits(['checkout', 'manual-amount'])
 </script>
 
 <style scoped>
@@ -260,6 +281,39 @@ defineEmits(['checkout'])
   font-weight: 700;
 }
 
+.btn-checkout.manual { background: #6366f1; }
+.btn-checkout.refund { background: #f0a500; }
+.total-amount.refund { color: var(--color-warning); }
+
+.refund-toggle {
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer; padding: 10px 0; user-select: none;
+}
+.refund-toggle input { display: none; }
+.refund-toggle-track {
+  width: 36px; height: 20px; background: var(--color-surface-3);
+  border: 1px solid var(--color-border); border-radius: 999px;
+  position: relative; transition: background 0.2s;
+  flex-shrink: 0;
+}
+.refund-toggle.active .refund-toggle-track { background: var(--color-warning); border-color: var(--color-warning); }
+.refund-toggle-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; background: white;
+  border-radius: 50%; transition: transform 0.2s;
+}
+.refund-toggle.active .refund-toggle-thumb { transform: translateX(16px); }
+.refund-toggle-label { font-size: 13px; color: var(--color-text-2); }
+.refund-toggle.active .refund-toggle-label { color: var(--color-warning); font-weight: 600; }
+
+.btn-manual-amount {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 8px; margin-bottom: 8px;
+  background: transparent; border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm); color: var(--color-text-2);
+  font-size: 13px; cursor: pointer; transition: all 0.15s;
+}
+.btn-manual-amount:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .btn-checkout {
   align-items: center;
   background: var(--color-primary);

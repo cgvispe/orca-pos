@@ -8,6 +8,7 @@ const settingsRoutes = require('./routes/settings');
 const sesamiRoutes = require('./routes/sesami');
 const categoriesRoutes = require('./routes/categories');
 const usersRoutes = require('./routes/users');
+const devicesRoutes = require('./routes/devices');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +31,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/sesami', sesamiRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/devices', devicesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

@@ -108,12 +108,22 @@
     },
     {
       "id": "2b18e0d9-6d10-42f5-996f-7db3cd23a724",
-      "code": "FOO004",
+      "code": "FRU003",
       "name": "coco",
       "price": 1.5,
-      "category": "Food",
+      "category": "Fruits",
       "imageUrl": null,
       "emoji": "🥥 ",
+      "active": true
+    },
+    {
+      "id": "527d4d32-539c-4c35-b3eb-3b25f035ec89",
+      "code": "FRU002",
+      "name": "Melon",
+      "price": 5,
+      "category": "Fruits",
+      "imageUrl": null,
+      "emoji": "🍈 ",
       "active": true
     }
   ],
@@ -134,7 +144,7 @@
       "mode": "dark",
       "primaryColor": "#00c4b3",
       "fontFamily": "Inter",
-      "logoUrl": null
+      "logoUrl": "/uploads/logo-4ff981a1-65a4-439c-aaab-bded892d391a.png"
     }
   },
   "categories": [
@@ -261,6 +271,76 @@
       "amountReceived": 1.5,
       "change": 0,
       "sesamiOperationId": 34167,
+      "status": "completed",
+      "cashier": "Administrator"
+    },
+    {
+      "id": "c7e346f7-d805-4643-b593-37c75a521e60",
+      "date": "2026-03-03T08:28:06.889Z",
+      "items": [
+        {
+          "id": "i5",
+          "code": "FOO001",
+          "name": "Croissant",
+          "price": 2.8,
+          "category": "Food",
+          "imageUrl": null,
+          "emoji": "🥐",
+          "active": true,
+          "qty": 1
+        },
+        {
+          "id": "i6",
+          "code": "FOO002",
+          "name": "Sandwich",
+          "price": 4.5,
+          "category": "Food",
+          "imageUrl": null,
+          "emoji": "🥪",
+          "active": true,
+          "qty": 1
+        }
+      ],
+      "total": 7.3,
+      "currency": "EUR",
+      "amountReceived": 10,
+      "change": 2.7,
+      "sesamiOperationId": 34244,
+      "status": "completed",
+      "cashier": "Administrator"
+    },
+    {
+      "id": "f70be17f-6b39-45c8-891f-93f47faf6094",
+      "date": "2026-03-03T08:28:06.923Z",
+      "items": [
+        {
+          "id": "i5",
+          "code": "FOO001",
+          "name": "Croissant",
+          "price": 2.8,
+          "category": "Food",
+          "imageUrl": null,
+          "emoji": "🥐",
+          "active": true,
+          "qty": 1
+        },
+        {
+          "id": "i6",
+          "code": "FOO002",
+          "name": "Sandwich",
+          "price": 4.5,
+          "category": "Food",
+          "imageUrl": null,
+          "emoji": "🥪",
+          "active": true,
+          "qty": 1
+        }
+      ],
+      "total": 7.3,
+      "currency": "EUR",
+      "amountReceived": 10,
+      "change": 2.7,
+      "sesamiOperationId": 34244,
       "status": "completed",
       "cashier": "Administrator"
     }

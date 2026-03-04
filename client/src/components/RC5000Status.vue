@@ -17,19 +17,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '@/api'
 
-// Device status codes from API:
-// 0=None/unconfigured, 1=Initializing, 2=Initialized(Ready), 
-// 4=SessionStarted, 5=Processing, 11=Waiting, 12=Warning, 13=Error
+const props = defineProps({
+  deviceId: { type: String, default: null }
+})
 
 const STATUS = {
-  UNCONFIGURED: 'unconfigured', // no IP configured or heartbeat failed
-  READY:        'ready',        // status=2, no session
-  SESSION:      'session',      // status=4 or 5 or 11 (user logged in)
-  WARNING:      'warning',      // status=12
-  ERROR:        'error',        // status=13
+  UNCONFIGURED: 'unconfigured',
+  READY:        'ready',
+  SESSION:      'session',
+  WARNING:      'warning',
+  ERROR:        'error',
   LOADING:      'loading'
 }
 
@@ -83,33 +83,29 @@ const stateClass = computed(() => ({
 }[state.value] || 'text-grey'))
 
 async function refresh() {
+  if (!props.deviceId) { state.value = STATUS.UNCONFIGURED; return }
   try {
-    // First check if device is reachable at all
-    await api.get('/sesami/heartbeat')
-    // If reachable, get full status
-    const res = await api.get('/sesami/status')
+    const res = await api.get(`/sesami/status/${props.deviceId}`)
     rawStatus.value = res.data
     const s = res.data.status
-    if (s === 2 || s === 1) {
-      state.value = STATUS.READY
-    } else if (s === 4 || s === 5 || s === 11) {
-      state.value = STATUS.SESSION
-    } else if (s === 12) {
-      state.value = STATUS.WARNING
-    } else if (s === 13 || s === 0) {
-      state.value = STATUS.ERROR
-    } else {
-      state.value = STATUS.READY
-    }
+    if      (s === 1 || s === 2)         state.value = STATUS.READY
+    else if (s === 4 || s === 5 || s === 11) state.value = STATUS.SESSION
+    else if (s === 12)                   state.value = STATUS.WARNING
+    else if (s === 13 || s === 0)        state.value = STATUS.ERROR
+    else                                 state.value = STATUS.READY
   } catch {
     state.value = STATUS.UNCONFIGURED
     rawStatus.value = null
   }
 }
 
+watch(() => props.deviceId, () => {
+  state.value = STATUS.LOADING
+  refresh()
+})
+
 onMounted(() => {
   refresh()
-  // Poll every 30 seconds
   pollTimer = setInterval(refresh, 30000)
 })
 
