@@ -1,4 +1,6 @@
-# Demo POS — Sesami SafePay RC5000 Integration
+# ORCA POS — On-site Recycler Cash Application
+
+> Sesami SafePay RC5000 Integration
 
 A full-featured Point of Sale web application with native integration with the **Sesami SafePay RC5000** cash recycler. Designed for touch screens on **Linux ARM64 i.MX8 boards** (Yocto), and fully compatible with Windows and macOS for development.
 
@@ -187,12 +189,47 @@ demo-pos/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/demo-pos.git
-cd demo-pos
+git clone https://github.com/cgvispe/orca-pos.git
+cd orca-pos
 
 # 2. Install all dependencies (root + server + client) in one command
 npm run install:all
 ```
+
+> ⚠️ `node_modules` are not included in the repository. You must run `npm run install:all` after every fresh clone — on every platform (Windows, macOS, Linux/ARM64). npm will install the correct native binaries for your OS automatically.
+
+### Troubleshooting on Linux / ARM64
+
+**Permission denied on `nodemon`, `vite` or `concurrently`**
+
+This happens when `node_modules` were copied from Windows (NTFS does not preserve Unix execute permissions). Fix:
+
+```bash
+chmod +x node_modules/.bin/*
+chmod +x server/node_modules/.bin/*
+chmod +x client/node_modules/.bin/*
+```
+
+Or do a clean reinstall (preferred):
+
+```bash
+rm -rf node_modules server/node_modules client/node_modules
+npm run install:all
+```
+
+**`CERT_NOT_YET_VALID` during npm install**
+
+The system clock is wrong. npm rejects SSL certificates if the board date is in the past. Fix:
+
+```bash
+# Sync with NTP (requires internet)
+sudo timedatectl set-ntp true
+
+# Or set manually
+sudo date -s "2026-03-02 10:00:00"
+```
+
+Then re-run `npm run install:all`.
 
 ---
 
@@ -299,8 +336,8 @@ GET /api/sesami/operation/:id  (every 1.5 seconds)
       ▼
   ┌───────────────────────────────────────────────────────┐
   │  status 1/2  → keep polling                           │
-  │  status 4/5  → SUCCESS  → finish → LOGOUT → save tx  │
-  │  status 8    → SUCCESS  → finish → LOGOUT → save tx  │
+  │  status 4/5  → SUCCESS  → finish → LOGOUT → save tx   │
+  │  status 8    → SUCCESS  → finish → LOGOUT → save tx   │
   │  status 7    → NO CHANGE → cashier: Finish or Cancel  │
   │  status 3/9  → CANCELLED by machine → LOGOUT          │
   │  status 6    → ERROR → LOGOUT                         │
