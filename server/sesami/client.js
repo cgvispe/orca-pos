@@ -197,8 +197,25 @@ async function cancelOperation(deviceId) {
   return response.data;
 }
 
+async function getContent(deviceId) {
+  if (sessions.get(deviceId)?.token) {
+    try { await logout(deviceId); } catch {}
+  }
+  await login(deviceId);
+  const device = getDeviceOrThrow(deviceId);
+  const token = getToken(deviceId);
+  const client = getClient(getBaseUrl(device), token);
+  try {
+    const response = await client.get('/content/current');
+    if (response.status !== 200) throw new Error(`Content failed — HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+    return response.data;
+  } finally {
+    try { await logout(deviceId); } catch {}
+  }
+}
+
 module.exports = {
   login, logout, getStatus, getHeartbeat,
   startPayinAmount, startPayoutAmount, getOperationStatus, finishOperation, cancelOperation,
-  sessions
+  getContent, sessions
 };

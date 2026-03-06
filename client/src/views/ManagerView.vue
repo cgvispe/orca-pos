@@ -191,6 +191,7 @@
                     <button v-else class="btn-sm" @click="setDefault(d.id)">Set Default</button>
                   </td>
                   <td class="action-cell">
+                    <button class="btn-sm teal" @click="openContentModal(d)" title="View Cash Contents">💰 Content</button>
                     <button class="btn-sm" @click="openDeviceModal(d)">Edit</button>
                     <button class="btn-sm danger" @click="deleteDevice(d.id)">Delete</button>
                     <button class="btn-sm warning" @click="resetModal.device=d; resetModal.token=''; resetModal.result=''; resetModal.open=true" title="Force Reset Session">🔄 Reset</button>
@@ -479,6 +480,101 @@
       </transition>
     </teleport>
 
+    <!-- Content Modal -->
+    <transition name="modal-fade">
+      <div v-if="contentModal.open" class="modal-backdrop" @click.self="contentModal.open=false">
+        <div class="modal-box content-modal">
+          <div class="content-modal-header">
+            <div>
+              <h2>💰 Cash Contents</h2>
+              <span class="content-device-name">{{ contentModal.device?.name }}</span>
+            </div>
+            <button class="btn-icon" @click="contentModal.open=false">✕</button>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="contentModal.loading" class="content-loading">
+            <div class="content-spinner"></div>
+            <span>Querying device…</span>
+          </div>
+
+          <!-- Error -->
+          <div v-else-if="contentModal.error" class="content-error">
+            <span>⚠️ {{ contentModal.error }}</span>
+            <button class="btn-secondary btn-sm" @click="loadContent(contentModal.device)">Retry</button>
+          </div>
+
+          <!-- Data -->
+          <template v-else-if="contentModal.data">
+            <!-- Summary cards -->
+            <div class="content-summary">
+              <div class="summary-card recycler">
+                <span class="summary-icon">♻️</span>
+                <div>
+                  <div class="summary-label">Recycler</div>
+                  <div class="summary-value">{{ theme.formatCurrency(contentModal.totals.recycler) }}</div>
+                  <div class="summary-sub">{{ contentModal.counts.recycler }} items</div>
+                </div>
+              </div>
+              <div class="summary-card deposit">
+                <span class="summary-icon">🏦</span>
+                <div>
+                  <div class="summary-label">Deposit</div>
+                  <div class="summary-value">{{ theme.formatCurrency(contentModal.totals.deposit) }}</div>
+                  <div class="summary-sub">{{ contentModal.counts.deposit }} items</div>
+                </div>
+              </div>
+              <div class="summary-card total">
+                <span class="summary-icon">💵</span>
+                <div>
+                  <div class="summary-label">Total</div>
+                  <div class="summary-value">{{ theme.formatCurrency(contentModal.totals.recycler + contentModal.totals.deposit) }}</div>
+                  <div class="summary-sub">{{ contentModal.counts.recycler + contentModal.counts.deposit }} items</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Module panels -->
+            <div class="content-panels">
+              <div v-for="module in ['recycler','deposit']" :key="module" class="content-panel">
+                <div class="panel-header" :class="module">
+                  <span>{{ module === 'recycler' ? '♻️ Recycler' : '🏦 Deposit' }}</span>
+                  <span class="panel-total">{{ theme.formatCurrency(contentModal.totals[module]) }}</span>
+                </div>
+
+                <div v-for="type in ['notes','coins']" :key="type">
+                  <div v-if="contentModal.data[module]?.[type]?.length" class="denom-section">
+                    <div class="denom-section-title">{{ type === 'notes' ? '🏧 Notes' : '🪙 Coins' }}</div>
+                    <div class="denom-chart">
+                      <div
+                        v-for="item in sortedDenoms(contentModal.data[module][type])"
+                        :key="item.value"
+                        class="denom-bar-col"
+                      >
+                        <div class="denom-count">{{ item.level }}</div>
+                        <div class="denom-bar-wrap">
+                          <div
+                            class="denom-bar-fill"
+                            :class="module"
+                            :style="{ height: barHeight(item.level, module, type) + 'px' }"
+                          ></div>
+                        </div>
+                        <div class="denom-label">{{ formatDenom(item.value, item.currency) }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="!contentModal.data[module]?.notes?.length && !contentModal.data[module]?.coins?.length" class="denom-empty">
+                  No contents reported
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </transition>
+
     <!-- Force Reset Modal -->
     <teleport to="body">
       <transition name="modal-fade">
@@ -672,6 +768,66 @@ async function loadUsers() {
   try { const res = await api.get('/users'); cashiers.value = res.data } catch {}
 }
 const resetModal = reactive({ open: false, device: null, token: '', working: false, result: '' })
+
+// ── Content Modal ─────────────────────────────────────────────────────────────
+const contentModal = reactive({
+  open: false, device: null, loading: false, error: '', data: null,
+  totals: { recycler: 0, deposit: 0 },
+  counts: { recycler: 0, deposit: 0 }
+})
+
+function calcTotals(levels) {
+  const calc = (module) => {
+    const items = [...(levels[module]?.notes || []), ...(levels[module]?.coins || [])]
+    return {
+      value: items.reduce((s, i) => s + (i.value / 100) * i.level, 0),
+      count: items.reduce((s, i) => s + i.level, 0)
+    }
+  }
+  const r = calc('recycler'); const d = calc('deposit')
+  contentModal.totals = { recycler: r.value, deposit: d.value }
+  contentModal.counts = { recycler: r.count, deposit: d.count }
+}
+
+async function openContentModal(device) {
+  contentModal.device = device
+  contentModal.open = true
+  contentModal.data = null
+  contentModal.error = ''
+  await loadContent(device)
+}
+
+async function loadContent(device) {
+  contentModal.loading = true
+  contentModal.error = ''
+  try {
+    const res = await api.get(`/sesami/content/${device.id}`)
+    contentModal.data = res.data.levels
+    calcTotals(res.data.levels)
+  } catch (e) {
+    contentModal.error = e.response?.data?.detail || e.response?.data?.error || e.message
+  } finally {
+    contentModal.loading = false
+  }
+}
+
+function sortedDenoms(arr) {
+  return [...arr].sort((a, b) => b.value - a.value)
+}
+
+function formatDenom(valueCents, currency) {
+  const euros = valueCents / 100
+  return new Intl.NumberFormat(theme.locale, {
+    style: 'currency', currency: currency || theme.currency,
+    minimumFractionDigits: euros % 1 === 0 ? 0 : 2
+  }).format(euros)
+}
+
+function barHeight(level, module, type) {
+  const items = contentModal.data[module]?.[type] || []
+  const max = Math.max(...items.map(i => i.level), 1)
+  return Math.max(3, Math.round((level / max) * 90))
+}
 
 const userModal = reactive({ open: false, user: null, saving: false, error: '', form: { name: '', username: '', password: '', canRefund: false } })
 function openUserModal(user) {
@@ -1136,7 +1292,79 @@ onMounted(async () => {
 .badge-no-refund { font-size: 13px; color: var(--color-text-3); }
 .refund-perm { margin: 4px 0 8px; }
 .badge-default { font-size: 11px; background: var(--color-primary-alpha); color: var(--color-primary); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--color-primary); }
-.device-test-row { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.btn-sm.teal { background: rgba(0,196,179,0.15); color: var(--color-primary); border-color: var(--color-primary); }
+.btn-sm.teal:hover { background: rgba(0,196,179,0.25); }
+
+/* ── Content Modal ──────────────────────────────────────── */
+.content-modal { max-width: 820px; width: 96vw; max-height: 90vh; overflow-y: auto; padding: 0; }
+.content-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--color-border);
+  position: sticky; top: 0; background: var(--color-surface); z-index: 1;
+}
+.content-modal-header h2 { margin: 0 0 2px; font-size: 18px; }
+.content-device-name { font-size: 13px; color: var(--color-text-3); }
+.btn-icon { background: none; border: none; color: var(--color-text-3); font-size: 18px; cursor: pointer; padding: 4px 8px; line-height: 1; }
+.btn-icon:hover { color: var(--color-text); }
+
+.content-loading { display: flex; align-items: center; gap: 12px; padding: 48px 24px; color: var(--color-text-2); }
+.content-spinner { width: 24px; height: 24px; border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.content-error { display: flex; align-items: center; gap: 12px; padding: 32px 24px; color: var(--color-danger); }
+
+.content-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  padding: 20px 24px; border-bottom: 1px solid var(--color-border);
+}
+.summary-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--color-surface-2); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: 14px 16px;
+}
+.summary-card.recycler { border-color: rgba(0,196,179,0.3); }
+.summary-card.deposit  { border-color: rgba(139,92,246,0.3); }
+.summary-card.total    { border-color: rgba(251,191,36,0.3); }
+.summary-icon { font-size: 28px; line-height: 1; }
+.summary-label { font-size: 11px; color: var(--color-text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.summary-value { font-size: 20px; font-weight: 700; color: var(--color-text); }
+.summary-sub { font-size: 11px; color: var(--color-text-3); margin-top: 2px; }
+
+.content-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.content-panel { padding: 16px 24px 24px; }
+.content-panel:first-child { border-right: 1px solid var(--color-border); }
+
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 14px; margin-bottom: 16px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--color-border);
+}
+.panel-header.recycler { color: var(--color-primary); }
+.panel-header.deposit  { color: #a78bfa; }
+.panel-total { font-size: 16px; font-weight: 700; }
+
+.denom-section { margin-bottom: 20px; }
+.denom-section-title { font-size: 11px; color: var(--color-text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+.denom-chart { display: flex; align-items: flex-end; gap: 8px; padding-bottom: 2px; }
+
+.denom-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.denom-count { font-size: 11px; font-weight: 600; color: var(--color-text-2); }
+.denom-bar-wrap { height: 90px; width: 100%; display: flex; align-items: flex-end; }
+.denom-bar-fill {
+  width: 100%; border-radius: 3px 3px 0 0;
+  transition: height 0.4s cubic-bezier(.4,0,.2,1);
+  min-height: 3px;
+}
+.denom-bar-fill.recycler { background: linear-gradient(to top, var(--color-primary), rgba(0,196,179,0.4)); }
+.denom-bar-fill.deposit  { background: linear-gradient(to top, #a78bfa, rgba(139,92,246,0.4)); }
+.denom-label { font-size: 10px; color: var(--color-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: center; }
+
+.denom-empty { font-size: 13px; color: var(--color-text-3); text-align: center; padding: 24px 0; }
+
+@media (max-width: 600px) {
+  .content-summary { grid-template-columns: 1fr; }
+  .content-panels { grid-template-columns: 1fr; }
+  .content-panel:first-child { border-right: none; border-bottom: 1px solid var(--color-border); }
+}
 .connection-status { font-size: 13px; padding: 8px 12px; border-radius: var(--radius-sm); margin: 0; }
 .connection-status.ok { color: #10b981; background: rgba(16,185,129,0.1); }
 .connection-status.error { color: var(--color-danger); background: var(--color-danger-alpha); }

@@ -264,6 +264,20 @@ router.post('/operation/finish-manual', authMiddleware, async (req, res) => {
   res.json({ ok: true, transaction: tx })
 })
 
+// GET /api/sesami/content/:deviceId — cash levels (login → /content/current → logout)
+router.get('/content/:deviceId', authMiddleware, async (req, res) => {
+  const { deviceId } = req.params;
+  const device = db.getDeviceById(deviceId);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
+  try {
+    const data = await sesami.getContent(deviceId);
+    res.json({ ok: true, device: { id: device.id, name: device.name }, levels: data.levels || data });
+  } catch (err) {
+    console.error('[RC5000 content]', err.message);
+    res.status(503).json({ error: 'RC5000 error', detail: err.message });
+  }
+});
+
 // GET /api/sesami/transactions?date=2026-03-04&status=completed,refund&cashierId=x,y&page=1&limit=100
 router.get('/transactions', authMiddleware, (req, res) => {
   const { date, status, cashierId, operationType, rcStatus, isManual, page = 1, limit = 100 } = req.query;
