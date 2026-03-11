@@ -92,7 +92,7 @@ A bug in `server/db.js` caused **primary color**, **font family**, and **font si
 Login recovery now also handles HTTP 500 responses with error code **636** (session already active on the device), in addition to the existing "Operación ya iniciada" string match. The server uses the persisted bearer token to cancel + logout before retrying.
 
 ### Device Form — Default Secret Key
-New device forms are pre-filled with `your-256-bit-secret` in the Secret Key field, the factory default used by Sesami devices.
+New device forms are pre-filled value in the Secret Key field, the factory default used by Sesami devices.
 
 ---
 
